@@ -1,0 +1,31 @@
+import { IconDefinition } from '@fortawesome/fontawesome-common-types';
+
+import createnewdocument from './createnewdocument.json';
+import inprogress from './inprogress.json';
+import instagram from './instagram.json';
+import costeffectiveresult from './costeffectiveresult.json';
+import formatletter from './formetletter.json';
+import tacticstogetmoney from './tactics-to-get-money.json';
+import showsconsumers from './showsconsumers.json';
+import people from './people.json';
+import monetarydamages from './monetarydamages.json';
+import letterincorrectinfo from './letterincorrectinfo.json';
+import highcollectorsfree from './highcollectorsfree.json';
+import helpconsumers from './helpconsumers.json';
+import filingoflawsuits from './filingoflawsuits.json';
+import creditRepair from './creditRepair.json';
+
+export const facCreatenewdocument = createnewdocument as IconDefinition;
+export const facInprogress = inprogress as IconDefinition;
+export const facInstagram = instagram as IconDefinition;
+export const faccosteffectiveresult = costeffectiveresult as IconDefinition;
+export const facformatletter = formatletter as IconDefinition;
+export const factacticstogetmoney = tacticstogetmoney as IconDefinition;
+export const facshowsconsumers = showsconsumers as IconDefinition;
+export const facpeople = people as IconDefinition;
+export const facmonetarydamages = monetarydamages as IconDefinition;
+export const facletterincorrectinfo = letterincorrectinfo as IconDefinition;
+export const fachighcollectorsfree = highcollectorsfree as IconDefinition;
+export const fachelpconsumers = helpconsumers as IconDefinition;
+export const facfilingoflawsuits = filingoflawsuits as IconDefinition;
+export const faccreditRepair = creditRepair as IconDefinition;

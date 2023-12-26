@@ -1,0 +1,107 @@
+trigger:
+  - develop
+resources:
+  - repo: self
+
+variables:
+  AgentPool: 'common-credit-guy-k8s'
+  dockerRegistryServiceConnection: 'mindpath-dev-acr'
+  imageRepository: 'common-credit-guy'
+  containerRegistry: 'mindpathregistrydev.azurecr.io'
+  dockerfilePath: '$(Build.SourcesDirectory)/Dockerfile'
+  tag: '$(Build.BuildId)'
+
+stages:
+  - stage: Build
+    displayName: Build and push stage
+    jobs:
+      - job: Build
+        displayName: Build
+        pool: $(AgentPool)
+        steps:
+          - task: Docker@2
+            displayName: Build and push an image to azure container registry
+            inputs:
+              command: buildAndPush
+              repository: $(imageRepository)
+              dockerfile: $(dockerfilePath)
+              containerRegistry: $(dockerRegistryServiceConnection)
+              tags: |
+                $(tag)
+                latest
+
+  - stage: DEV
+    variables:
+      - group: common-credit-guy
+    jobs:
+      - deployment: Dev
+        environment:
+          name: Dev
+        pool: 'common-credit-guy-k8s'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: SSH@0
+                  inputs:
+                    sshEndpoint: 'proxy-vpn-k8s'
+                    runOptions: 'commands'
+                    commands: |
+                      echo "===============Updating Deployments================"
+                        kubectl set image deployment/common-credit-guy common-credit-guy=$(ACR_DEV)/$(IMAGE):$(Build.BuildId)
+                      printf "#################UPDATING OR ADDING  VARIABLE######"
+                        kubectl set env deployment/common-credit-guy NODE_ENV='$(NODE_ENV)' JWT_SECRET_KEY='$(JWT_SECRET_KEY)' PORT='$(PORT)' DB_URL='$(DB_URL)' EMAIL='$(EMAIL)' EMAIL_PASSWORD='$(EMAIL_PASSWORD)' EMAIL_HOST='$(EMAIL_HOST)' EMAIL_PORT='$(EMAIL_PORT)' URL_DOMAIN='$(URL_DOMAIN)' CRYPTO_ALGORITHM='$(CRYPTO_ALGORITHM)' CRYPTO_SECRET_KEY='$(CRYPTO_SECRET_KEY)' CRYPTO_IV='$(CRYPTO_IV)' STRIPE_SECRET_KEY='$(STRIPE_SECRET_KEY)' NEXT_PUBLIC_API_URL='$(NEXT_PUBLIC_API_URL)' NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY='$(NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)' NEXTAUTH_URL='$(NEXTAUTH_URL)' NEXTAUTH_SECRET='$(NEXTAUTH_SECRET)' NEXT_GOOGLE_CLIENT_ID='$(NEXT_GOOGLE_CLIENT_ID)' NEXT_GOOGLE_CLIENT_SECRET='$(NEXT_GOOGLE_CLIENT_SECRET)'
+                      printf "###############List All Environment################"
+                        kubectl set env deployment/common-credit-guy  --list
+                    readyTimeout: '20000'
+
+  - stage: Prod
+    variables:
+      - group: common-credit-guy-prod
+    jobs:
+      - deployment: Prod
+        environment:
+          name: Prod
+        pool: 'common-credit-guy-k8s'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: SSH@0
+                  inputs:
+                    sshEndpoint: 'common-cred-guy-prod'
+                    runOptions: 'inline'
+                    inline: |
+                      cd /home/docker-ce/common-credit-guy;
+                        docker login -u mindpathregistrydev -p $(ACR_pass) $(ACR_DEV)/$(IMAGE) > /dev/null 2>&1
+                        echo "===================Pull Image========================="
+                          docker pull $(ACR_DEV)/$(IMAGE):$(Build.BuildId)
+                          docker tag $(ACR_DEV)/$(IMAGE):$(Build.BuildId) $(ACR_DEV)/$(IMAGE):latest
+                        echo "=================Updating Container ==================="
+                          echo "IMAGE=$(ACR_DEV)/$(IMAGE):$(Build.BuildId)" > env
+                          echo "NEXT_PUBLIC_API_URL=$(NEXT_PUBLIC_API_URL)" >>env
+                          echo "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=$(NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)" >>env
+                          echo "NODE_ENV=$(NODE_ENV)" >>env
+                          echo "CRYPTO_ALGORITHM=$(CRYPTO_ALGORITHM)" >>env
+                          echo "CRYPTO_IV=$(CRYPTO_IV)" >>env
+                          echo "CRYPTO_SECRET_KEY=$(CRYPTO_SECRET_KEY)" >>env
+                          echo "DB_URL=$(DB_URL)" >>env
+                          echo "EMAIL=$(EMAIL)" >>env
+                          echo "EMAIL_HOST=$(EMAIL_HOST)" >>env
+                          echo "EMAIL_PASSWORD=$(EMAIL_PASSWORD)" >>env
+                          echo "EMAIL_PORT=$(EMAIL_PORT)" >>env
+                          echo "JWT_SECRET_KEY=$(JWT_SECRET_KEY)" >>env
+                          echo "PORT=$(PORT)" >>env
+                          echo "STRIPE_SECRET_KEY=$(STRIPE_SECRET_KEY)" >>env
+                          echo "URL_DOMAIN=$(URL_DOMAIN)" >>env
+                          echo "NEXTAUTH_URL=$(NEXTAUTH_URL)" >>env
+                          echo "NEXTAUTH_SECRET=$(NEXTAUTH_SECRET)" >>env
+                          echo "NEXT_GOOGLE_CLIENT_ID=$(NEXT_GOOGLE_CLIENT_ID)" >>env
+                          echo "NEXT_GOOGLE_CLIENT_SECRET=$(NEXT_GOOGLE_CLIENT_SECRET)" >>env
+
+                        docker-compose config
+                        docker-compose -p common-credit-guy down  > /dev/null 2>&1
+                        docker-compose -p common-credit-guy up -d  > /dev/null 2>&1
+                          echo "============Untage Image ==========="
+                        docker rmi $(ACR_DEV)/$(IMAGE):$(Build.BuildId)
+                    readyTimeout: '20000'
